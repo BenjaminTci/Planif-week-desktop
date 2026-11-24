@@ -1,0 +1,4 @@
+# Runtime C intégré à l'exécutable : il démarre aussi sur un PC
+# où les « Visual C++ Redistributable » ne sont pas installés.
+[target.x86_64-pc-windows-msvc]
+rustflags = ["-C", "target-feature=+crt-static"]
