@@ -70,6 +70,8 @@ struct DropTarget {
 
 struct Adding {
     slot: Slot,
+    /// Saisie ouverte dans la liste (clic sur une ligne vide) plutôt qu'en bas de la colonne.
+    in_list: bool,
     text: String,
     focus: bool,
 }
@@ -460,6 +462,8 @@ impl PlanifApp {
             .collect();
 
         let mut placed = Vec::with_capacity(cards.len());
+        // Bas du contenu (cartes et éventuelle saisie), là où commencent les lignes vides.
+        let mut content_bottom = list.top();
         let mut child = ui.new_child(
             UiBuilder::new()
                 .id_salt(("colonne", slot))
@@ -477,19 +481,62 @@ impl PlanifApp {
                     let (rect, _) = ui.allocate_exact_size(vec2(width, layout.height), Sense::hover());
                     self.show_card(ui, rect, *key, view, &layout);
                     placed.push((*key, rect));
+                    content_bottom = rect.bottom();
+                }
+                // Saisie ouverte par un clic sur une ligne vide : juste sous les cartes,
+                // là où la nouvelle tâche apparaîtra.
+                if self.adding.as_ref().is_some_and(|a| a.slot == slot && a.in_list) {
+                    let (rect, _) = ui.allocate_exact_size(vec2(width, LINE_STEP - 6.0), Sense::hover());
+                    self.adding_field(ui, rect, slot);
+                    content_bottom = rect.bottom();
                 }
             });
 
         // Lignes de cahier dans l'espace libre.
         let painter = ui.painter_at(list);
-        let mut y = placed
-            .last()
-            .map_or(list.top() + LINE_STEP, |(_, r)| r.bottom() + LINE_STEP);
+        let mut y = content_bottom + LINE_STEP;
         while y < list.bottom() - 2.0 {
             painter.hline(list.x_range(), y, Stroke::new(1.0, theme::LINE));
             y += LINE_STEP;
         }
+
+        // Un clic sur une ligne vide ouvre la saisie à la suite des cartes.
+        let adding_here = self.adding.as_ref().is_some_and(|a| a.slot == slot && a.in_list);
+        let empty = Rect::from_min_max(pos2(list.left(), content_bottom.max(list.top())), list.max);
+        if !adding_here && empty.height() > 12.0 {
+            let resp = ui.interact(empty, Id::unique(("ligne-vide", slot)), Sense::click());
+            if resp.hovered() && self.drag.is_none() {
+                let hint = Rect::from_min_size(
+                    pos2(list.left(), content_bottom.max(list.top()) + 4.0),
+                    vec2(list.width(), LINE_STEP - 8.0),
+                )
+                .intersect(empty);
+                painter.rect_filled(hint, CornerRadius::same(8), Color32::from_rgb(0xF4, 0xF6, 0xF9));
+                painter.text(
+                    hint.left_center() + vec2(6.0, 0.0),
+                    Align2::LEFT_CENTER,
+                    "+ Ajouter une tâche",
+                    theme::regular(14.5),
+                    theme::MUTED,
+                );
+                ui.ctx().set_cursor_icon(CursorIcon::PointingHand);
+            }
+            if resp.clicked() && self.drag.is_none() {
+                self.start_adding(slot, true);
+            }
+        }
         placed
+    }
+
+    /// Ouvre une saisie ; celle déjà ouverte ailleurs est enregistrée si elle contient du texte.
+    fn start_adding(&mut self, slot: Slot, in_list: bool) {
+        if let Some(previous) = self.adding.take() {
+            let text = previous.text.trim().to_owned();
+            if !text.is_empty() {
+                self.actions.push(Action::Add(previous.slot, text));
+            }
+        }
+        self.adding = Some(Adding { slot, in_list, text: String::new(), focus: true });
     }
 
     fn show_card(&mut self, ui: &mut Ui, rect: Rect, key: OccKey, view: &CardView, layout: &CardLayout) {
@@ -564,40 +611,8 @@ impl PlanifApp {
 
     /// « + Ajouter une tâche », ou le champ de saisie quand on est en train d'ajouter.
     fn add_row(&mut self, ui: &mut Ui, rect: Rect, slot: Slot) {
-        if let Some(adding) = self.adding.as_mut().filter(|a| a.slot == slot) {
-            let mut child = ui.new_child(
-                UiBuilder::new()
-                    .id_salt(("saisie", slot))
-                    .max_rect(rect)
-                    .layout(Layout::left_to_right(Align::Center)),
-            );
-            let response = TextEdit::singleline(&mut adding.text)
-                .hint_text("Nouvelle tâche, puis Entrée")
-                .desired_width(rect.width())
-                .margin(vec2(10.0, 8.0))
-                .show(&mut child)
-                .response;
-            if adding.focus {
-                response.request_focus();
-                adding.focus = false;
-            }
-            if response.lost_focus() {
-                let (enter, escape) = ui.input(|i| (i.key_pressed(Key::Enter), i.key_pressed(Key::Escape)));
-                let text = adding.text.trim().to_owned();
-                if escape {
-                    self.adding = None;
-                } else if enter && !text.is_empty() {
-                    // On reste en saisie pour enchaîner plusieurs tâches.
-                    adding.text.clear();
-                    adding.focus = true;
-                    self.actions.push(Action::Add(slot, text));
-                } else {
-                    if !text.is_empty() {
-                        self.actions.push(Action::Add(slot, text));
-                    }
-                    self.adding = None;
-                }
-            }
+        if self.adding.as_ref().is_some_and(|a| a.slot == slot && !a.in_list) {
+            self.adding_field(ui, rect, slot);
             return;
         }
 
@@ -617,7 +632,48 @@ impl PlanifApp {
             if hovered { theme::MUTED } else { theme::FAINT },
         );
         if resp.clicked() {
-            self.adding = Some(Adding { slot, text: String::new(), focus: true });
+            self.start_adding(slot, false);
+        }
+    }
+
+    /// Champ de saisie d'une nouvelle tâche : Entrée ajoute et garde le champ ouvert,
+    /// Échap annule, cliquer ailleurs ajoute le texte saisi puis ferme.
+    fn adding_field(&mut self, ui: &mut Ui, rect: Rect, slot: Slot) {
+        if let Some(adding) = self.adding.as_mut().filter(|a| a.slot == slot) {
+            let mut child = ui.new_child(
+                UiBuilder::new()
+                    .id_salt(("saisie", slot))
+                    .max_rect(rect)
+                    .layout(Layout::left_to_right(Align::Center)),
+            );
+            let response = TextEdit::singleline(&mut adding.text)
+                .hint_text("Nouvelle tâche, puis Entrée")
+                .desired_width(rect.width())
+                .margin(vec2(10.0, 8.0))
+                .show(&mut child)
+                .response;
+            if adding.focus {
+                response.request_focus();
+                response.scroll_to_me(None);
+                adding.focus = false;
+            }
+            if response.lost_focus() {
+                let (enter, escape) = ui.input(|i| (i.key_pressed(Key::Enter), i.key_pressed(Key::Escape)));
+                let text = adding.text.trim().to_owned();
+                if escape {
+                    self.adding = None;
+                } else if enter && !text.is_empty() {
+                    // On reste en saisie pour enchaîner plusieurs tâches.
+                    adding.text.clear();
+                    adding.focus = true;
+                    self.actions.push(Action::Add(slot, text));
+                } else {
+                    if !text.is_empty() {
+                        self.actions.push(Action::Add(slot, text));
+                    }
+                    self.adding = None;
+                }
+            }
         }
     }
 
