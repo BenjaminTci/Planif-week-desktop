@@ -14,6 +14,7 @@ use crate::card::{self, CardLayout, CardView, PaintState};
 use crate::dates::{self, monday_of, weekday_index};
 use crate::editor::{Edit, Editor, Kind, Outcome};
 use crate::model::{OccKey, Planner, Schedule, Slot, TaskColor};
+use crate::settings::Settings;
 use crate::storage::Storage;
 use crate::theme;
 
@@ -112,6 +113,7 @@ pub struct PlanifApp {
     nav_hover: Option<(i64, f64)>,
     adding: Option<Adding>,
     editor: Option<Editor>,
+    settings: Option<Settings>,
     toast: Option<Toast>,
 }
 
@@ -137,6 +139,7 @@ impl PlanifApp {
             nav_hover: None,
             adding: None,
             editor: None,
+            settings: None,
             toast: warning.map(Toast::error),
         }
     }
@@ -272,7 +275,19 @@ impl PlanifApp {
         // Boutons, de droite à gauche.
         let btn_h = 46.0;
         let top = rect.top() + 4.0;
-        let nav = Rect::from_min_size(pos2(rect.right() - 100.0, top), vec2(100.0, btn_h));
+        let gear = Rect::from_min_size(pos2(rect.right() - btn_h, top), vec2(btn_h, btn_h));
+        let resp = ui
+            .interact(gear, Id::unique("parametres-bouton"), Sense::click())
+            .on_hover_text("Paramètres");
+        let fill = if resp.hovered() { Color32::from_rgb(0xF3, 0xF5, 0xF9) } else { theme::SURFACE };
+        painter.rect(gear, CornerRadius::same(10), fill, Stroke::new(1.0, theme::BORDER), StrokeKind::Inside);
+        paint_gear(&painter, gear.center(), theme::TEXT, fill);
+        if resp.clicked() {
+            self.adding = None;
+            self.settings = Some(Settings::open());
+        }
+
+        let nav = Rect::from_min_size(pos2(gear.left() - 12.0 - 100.0, top), vec2(100.0, btn_h));
         let prev = Rect::from_min_max(nav.min, pos2(nav.center().x, nav.bottom()));
         let next = Rect::from_min_max(pos2(nav.center().x, nav.top()), nav.max);
         painter.rect(nav, CornerRadius::same(10), theme::SURFACE, Stroke::new(1.0, theme::BORDER), StrokeKind::Inside);
@@ -827,7 +842,11 @@ impl PlanifApp {
     // ----- Raccourcis, fenêtre d'édition, notifications ------------------------------
 
     fn shortcuts(&mut self, ctx: &egui::Context) {
-        if self.editor.is_some() || self.drag.is_some() || ctx.memory(|m| m.focused().is_some()) {
+        if self.editor.is_some()
+            || self.settings.is_some()
+            || self.drag.is_some()
+            || ctx.memory(|m| m.focused().is_some())
+        {
             return;
         }
         let (undo, left, right, home) = ctx.input(|i| {
@@ -957,6 +976,11 @@ impl eframe::App for PlanifApp {
         self.update_drag(&ctx);
         self.shortcuts(&ctx);
         self.editor(&ctx);
+        if let Some(settings) = self.settings.as_mut()
+            && !settings.show(&ctx)
+        {
+            self.settings = None;
+        }
         self.show_toast(&ctx);
         self.apply_actions();
         self.save_if_dirty();
@@ -975,6 +999,17 @@ fn column_frame(painter: &Painter, rect: Rect, highlight: bool) {
         Stroke::new(1.0, theme::BORDER)
     };
     painter.rect(rect, CornerRadius::same(ROUND), theme::SURFACE, stroke, StrokeKind::Inside);
+}
+
+/// Roue crantée du bouton Paramètres.
+fn paint_gear(painter: &Painter, center: Pos2, color: Color32, background: Color32) {
+    for i in 0..8 {
+        let a = i as f32 * std::f32::consts::TAU / 8.0;
+        let dir = vec2(a.cos(), a.sin());
+        painter.line_segment([center + dir * 6.0, center + dir * 9.5], Stroke::new(3.2, color));
+    }
+    painter.circle_filled(center, 7.2, color);
+    painter.circle_filled(center, 3.0, background);
 }
 
 fn paint_chevron(painter: &Painter, center: Pos2, left: bool, color: Color32) {

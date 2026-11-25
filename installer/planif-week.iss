@@ -49,6 +49,12 @@ Source: "..\target\release\{#AppExe}"; DestDir: "{app}"; Flags: ignoreversion
 Name: "{autoprograms}\{#AppName}"; Filename: "{app}\{#AppExe}"
 Name: "{autodesktop}\{#AppName}"; Filename: "{app}\{#AppExe}"; Tasks: desktopicon
 
+[Registry]
+; Rien n'est créé à l'installation : l'application gère elle-même le lancement au démarrage
+; (Paramètres). La désinstallation retire l'entrée si elle existe.
+Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: none; ValueName: "PlanifWeek"; Flags: uninsdeletevalue dontcreatekey
+Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Explorer\StartupApproved\Run"; ValueType: none; ValueName: "PlanifWeek"; Flags: uninsdeletevalue dontcreatekey
+
 [Run]
 Filename: "{app}\{#AppExe}"; Description: "{cm:LaunchProgram,{#AppName}}"; Flags: nowait postinstall skipifsilent
 

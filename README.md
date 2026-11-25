@@ -31,6 +31,7 @@ L'icône (`assets/planif-week.ico`) se régénère avec `python installer/make_i
 - **Déplacer** : glissez une carte vers un autre jour, vers « Un jour » ou à une autre place dans la même colonne. Pour changer de semaine pendant le glisser, maintenez la carte un instant sur une flèche ‹ ›.
 - **Modifier** : cliquez sur la carte pour changer le titre, l'heure, la couleur, le jour, ou la rendre récurrente (« Chaque semaine », un ou plusieurs jours). Le clic droit donne les mêmes actions.
 - **Tâches récurrentes** : chaque occurrence se coche séparément. En déplaçant une occurrence, seul ce jour-là bouge et la série continue. « Retirer ce jour-là » enlève une seule occurrence.
+- **Lancement au démarrage** : bouton ⚙ (Paramètres), « Lancer au démarrage de Windows ». Le réglage ajoute l'application aux programmes de démarrage de l'utilisateur, sans droits administrateur. Il reste coupé tant qu'on ne l'active pas, et la désinstallation le retire.
 - **Raccourcis** : ← → pour changer de semaine, Origine pour revenir à aujourd'hui, Ctrl+Z pour annuler.
 
 ## Données
