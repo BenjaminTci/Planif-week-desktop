@@ -29,7 +29,7 @@ L'icône (`assets/planif-week.ico`) se régénère avec `python installer/make_i
 - **Ajouter** : « + Ajouter une tâche » en bas d'un jour (ou de « Un jour »), tapez le titre puis Entrée. Vous pouvez enchaîner plusieurs tâches, et Échap ferme la saisie. Une heure en fin de titre est reconnue : « Sport 18h30 ».
 - **Cocher** : cliquez sur le rond.
 - **Déplacer** : glissez une carte vers un autre jour, vers « Un jour » ou à une autre place dans la même colonne. Pour changer de semaine pendant le glisser, maintenez la carte un instant sur une flèche ‹ ›.
-- **Modifier** : cliquez sur la carte pour changer le titre, l'heure, la couleur, le jour, ou la rendre récurrente (« Chaque semaine », un ou plusieurs jours). Le clic droit donne les mêmes actions.
+- **Modifier** : cliquez sur la carte pour changer le titre, l'heure, la couleur, le jour, ou la rendre récurrente : « Par semaine » (un ou plusieurs jours) ou « Par mois » (une échéance à un jour du mois ; les mois plus courts, elle tombe leur dernier jour). Les flèches ‹ › règlent l'écart, de « toutes les semaines » à « toutes les 12 semaines », de « tous les mois » à « tous les 12 mois ». Le clic droit donne les mêmes actions.
 - **Tâches récurrentes** : chaque occurrence se coche séparément. En déplaçant une occurrence, seul ce jour-là bouge et la série continue. « Retirer ce jour-là » enlève une seule occurrence.
 - **Lancement au démarrage** : bouton ⚙ (Paramètres), « Lancer au démarrage de Windows ». Le réglage ajoute l'application aux programmes de démarrage de l'utilisateur, sans droits administrateur. Il reste coupé tant qu'on ne l'active pas, et la désinstallation le retire.
 - **Raccourcis** : ← → pour changer de semaine, Origine pour revenir à aujourd'hui, Ctrl+Z pour annuler.

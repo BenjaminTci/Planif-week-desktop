@@ -17,6 +17,13 @@ pub fn weekday_index(date: NaiveDate) -> u8 {
     date.weekday().num_days_from_monday() as u8
 }
 
+/// Nombre de jours du mois qui contient `date` (28 à 31).
+pub fn days_in_month(date: NaiveDate) -> u32 {
+    let (y, m) = if date.month() == 12 { (date.year() + 1, 1) } else { (date.year(), date.month() + 1) };
+    let first_next = NaiveDate::from_ymd_opt(y, m, 1).expect("premier jour du mois valide");
+    (first_next - Duration::days(1)).day()
+}
+
 /// Lundi de la semaine qui contient `date`.
 pub fn monday_of(date: NaiveDate) -> NaiveDate {
     date - Duration::days(i64::from(weekday_index(date)))
@@ -122,6 +129,15 @@ pub fn long_date(date: NaiveDate, today: NaiveDate) -> String {
     }
 }
 
+/// « novembre », ou « janvier 2027 » si l'année diffère de `today`.
+pub fn month_year(date: NaiveDate, today: NaiveDate) -> String {
+    if date.year() == today.year() {
+        month_name(date).to_owned()
+    } else {
+        format!("{} {}", month_name(date), date.year())
+    }
+}
+
 pub fn format_time(time: NaiveTime) -> String {
     format!("{:02}:{:02}", time.hour(), time.minute())
 }
@@ -177,6 +193,10 @@ mod tests {
         assert_eq!(monday_of(d(2026, 11, 23)), d(2026, 11, 23));
         assert_eq!(iso_week(d(2026, 11, 23)), 48);
         assert_eq!(week_days(d(2026, 11, 23))[6], d(2026, 11, 29));
+        assert_eq!(days_in_month(d(2026, 11, 27)), 30);
+        assert_eq!(days_in_month(d(2026, 12, 1)), 31);
+        assert_eq!(days_in_month(d(2027, 2, 10)), 28);
+        assert_eq!(days_in_month(d(2028, 2, 10)), 29);
     }
 
     #[test]
@@ -198,6 +218,8 @@ mod tests {
         assert_eq!(relative_label(d(2026, 11, 2), today), "Il y a 3 semaines");
         assert_eq!(long_date(d(2026, 11, 24), today), "mardi 24 novembre");
         assert_eq!(long_date(d(2027, 1, 4), today), "lundi 4 janvier 2027");
+        assert_eq!(month_year(d(2026, 12, 5), today), "décembre");
+        assert_eq!(month_year(d(2027, 1, 5), today), "janvier 2027");
     }
 
     #[test]

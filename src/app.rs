@@ -1086,30 +1086,32 @@ fn apply_edit(p: &mut Planner, id: u64, occurrence: Option<NaiveDate>, edit: Edi
     task.title = edit.title;
     task.time = edit.time;
     task.color = edit.color;
-    let days: BTreeSet<u8> = edit.days.into_iter().collect();
-    match (edit.kind, task.is_recurring()) {
-        (Kind::Weekly, true) => {
-            if let Schedule::Weekly { days: current, .. } = &mut task.schedule {
-                *current = days;
-            }
+    // Une série garde son point de départ ; une nouvelle série part de la semaine affichée.
+    let since = match &task.schedule {
+        Schedule::Weekly { since, .. } | Schedule::Monthly { since, .. } => *since,
+        _ => monday_of(edit.date),
+    };
+    let every = edit.every;
+    let mut schedule = match edit.kind {
+        Kind::Weekly => Schedule::Weekly { days: edit.days.into_iter().collect::<BTreeSet<u8>>(), since, every },
+        Kind::Monthly => Schedule::Monthly { day: edit.month_day, since, every },
+        Kind::Date => Schedule::Date { date: edit.date },
+        Kind::Someday => Schedule::Someday,
+    };
+    // « Toutes les X semaines / tous les X mois » : la semaine ou le mois
+    // de la carte modifiée reste dans le cycle.
+    schedule.align_cycle_on(occurrence.unwrap_or(edit.date));
+    let same_kind = std::mem::discriminant(&task.schedule) == std::mem::discriminant(&schedule);
+    if !same_kind {
+        // Une occurrence qui quitte sa série garde son état « terminée ».
+        if task.is_recurring() {
+            task.done = occurrence.is_some_and(|d| task.done_dates.contains(&d));
         }
-        (Kind::Weekly, false) => {
-            task.schedule = Schedule::Weekly { days, since: monday_of(edit.date) };
+        if matches!(schedule, Schedule::Weekly { .. } | Schedule::Monthly { .. }) {
             task.done = false;
-            task.done_dates.clear();
-            task.skipped_dates.clear();
         }
-        (kind, was_recurring) => {
-            if was_recurring {
-                task.done = occurrence.is_some_and(|d| task.done_dates.contains(&d));
-                task.done_dates.clear();
-                task.skipped_dates.clear();
-            }
-            task.schedule = if kind == Kind::Date {
-                Schedule::Date { date: edit.date }
-            } else {
-                Schedule::Someday
-            };
-        }
+        task.done_dates.clear();
+        task.skipped_dates.clear();
     }
+    task.schedule = schedule;
 }
