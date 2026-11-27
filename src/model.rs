@@ -126,6 +126,9 @@ impl Schedule {
 pub struct Task {
     pub id: u64,
     pub title: String,
+    /// Texte libre facultatif (vide = pas de description).
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub description: String,
     #[serde(default)]
     pub time: Option<NaiveTime>,
     #[serde(default)]
@@ -294,6 +297,7 @@ impl Planner {
         self.tasks.push(Task {
             id,
             title,
+            description: String::new(),
             time,
             color,
             schedule,
@@ -371,6 +375,7 @@ impl Planner {
             let copy = Task {
                 id: new_id,
                 title: task.title.clone(),
+                description: task.description.clone(),
                 time: task.time,
                 color: task.color,
                 schedule: target.schedule(),
@@ -557,6 +562,8 @@ mod tests {
         let thu = d(2026, 11, 26);
         let fri = d(2026, 11, 27);
         let id = p.add("Sport".into(), None, TaskColor::Vert, weekly(&[3], d(2026, 11, 23)));
+        p.task_mut(id).unwrap().description = "Salle du centre-ville
+Prendre la serviette".into();
         let key = OccKey { task_id: id, date: Some(thu) };
         p.toggle_done(key);
         p.move_item(key, Slot::Day(fri), 0);
@@ -567,6 +574,8 @@ mod tests {
         let copy = p.task(moved[0].task_id).unwrap();
         assert!(!copy.is_recurring());
         assert!(copy.done, "l'état terminé suit la carte");
+        assert_eq!(copy.description, "Salle du centre-ville
+Prendre la serviette");
         assert_eq!(p.items(Slot::Day(d(2026, 12, 3))).len(), 1, "la série continue");
 
         // Réordonner une récurrente dans son propre jour garde la série intacte.
@@ -631,9 +640,16 @@ mod tests {
 
         let mut p = Planner::default();
         p.add("Marché".into(), NaiveTime::from_hms_opt(9, 0, 0), TaskColor::Vert, weekly(&[5], d(2026, 11, 23)));
-        p.add("Portfolio".into(), None, TaskColor::Violet, Schedule::Someday);
+        let portfolio = p.add("Portfolio".into(), None, TaskColor::Violet, Schedule::Someday);
+        p.task_mut(portfolio).unwrap().description = "Ajouter les 3 derniers projets".into();
         let json = serde_json::to_string(&p).unwrap();
         let back: Planner = serde_json::from_str(&json).unwrap();
         assert_eq!(p, back);
+        assert_eq!(json.matches("\"description\"").count(), 1, "pas de champ vide enregistré");
+
+        // Un fichier sans description se lit avec une description vide.
+        let old = r#"{"version":1,"next_id":2,"tasks":[{"id":1,"title":"Sport","schedule":{"type":"someday"}}]}"#;
+        let back: Planner = serde_json::from_str(old).unwrap();
+        assert_eq!(back.tasks[0].description, "");
     }
 }

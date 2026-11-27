@@ -22,11 +22,13 @@ const PAD_RIGHT: f32 = 12.0;
 const CHECK_CENTER_X: f32 = 21.0;
 const CHECK_R: f32 = 9.0;
 const ICON_W: f32 = 14.0;
+const DESC_GAP: f32 = 1.0;
 
 /// Ce qu'il faut pour dessiner une carte (copié depuis la tâche).
 #[derive(Clone, Debug)]
 pub struct CardView {
     pub title: String,
+    pub description: String,
     pub time: Option<NaiveTime>,
     pub color: TaskColor,
     pub done: bool,
@@ -37,6 +39,7 @@ impl CardView {
     pub fn new(task: &Task, done: bool) -> Self {
         Self {
             title: task.title.clone(),
+            description: task.description.clone(),
             time: task.time,
             color: task.color,
             done,
@@ -47,6 +50,8 @@ impl CardView {
 
 pub struct CardLayout {
     title: Arc<Galley>,
+    /// Aperçu de la description : une ligne, coupée par « … ».
+    description: Option<Arc<Galley>>,
     time: Option<Arc<Galley>>,
     pub height: f32,
 }
@@ -88,8 +93,23 @@ pub fn layout(painter: &Painter, view: &CardView, width: f32, alpha: f32) -> Car
         },
     );
     let title = painter.layout_job(job);
-    let height = (title.size().y + 2.0 * PAD_Y).max(MIN_HEIGHT);
-    CardLayout { title, time, height }
+
+    let preview = view.description.split_whitespace().collect::<Vec<_>>().join(" ");
+    let description = (!preview.is_empty()).then(|| {
+        let color = if view.done { theme::DONE_FG } else { theme::MUTED };
+        let mut job = LayoutJob::single_section(
+            preview,
+            TextFormat { font_id: theme::regular(12.5), color: fade(color, alpha), ..Default::default() },
+        );
+        job.wrap.max_width = wrap;
+        job.wrap.max_rows = 1;
+        job.wrap.overflow_character = Some('…');
+        painter.layout_job(job)
+    });
+
+    let text_h = title.size().y + description.as_ref().map_or(0.0, |d| DESC_GAP + d.size().y);
+    let height = (text_h + 2.0 * PAD_Y).max(MIN_HEIGHT);
+    CardLayout { title, description, time, height }
 }
 
 /// Zone cliquable du rond « terminée ».
@@ -132,12 +152,17 @@ pub fn paint(painter: &Painter, rect: Rect, view: &CardView, layout: &CardLayout
         painter.circle_stroke(c, CHECK_R, Stroke::new(1.8, fade(ring, alpha)));
     }
 
-    // Titre, centré verticalement.
+    // Titre (et aperçu de la description), centrés verticalement.
+    let desc_h = layout.description.as_ref().map_or(0.0, |d| DESC_GAP + d.size().y);
     let title_pos = pos2(
         rect.left() + TEXT_LEFT,
-        rect.center().y - layout.title.size().y / 2.0,
+        rect.center().y - (layout.title.size().y + desc_h) / 2.0,
     );
     painter.galley(title_pos, layout.title.clone(), theme::TEXT);
+    if let Some(desc) = &layout.description {
+        let pos = title_pos + vec2(0.0, layout.title.size().y + DESC_GAP);
+        painter.galley(pos, desc.clone(), theme::MUTED);
+    }
 
     // Heure et icône de récurrence, à droite.
     let mut x = rect.right() - PAD_RIGHT;

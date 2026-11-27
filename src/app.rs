@@ -566,6 +566,14 @@ impl PlanifApp {
                 ui.ctx().set_cursor_icon(CursorIcon::Grab);
             }
         }
+        // Description complète au survol (l'aperçu sur la carte tient sur une ligne).
+        if !dragging && !view.description.is_empty() {
+            resp.clone().on_hover_ui(|ui| {
+                ui.set_max_width(320.0);
+                ui.label(RichText::new(&view.title).strong());
+                ui.label(&view.description);
+            });
+        }
         resp.context_menu(|ui| self.card_menu(ui, key, view));
 
         card::paint(
@@ -1084,6 +1092,7 @@ fn paint_chevron(painter: &Painter, center: Pos2, left: bool, color: Color32) {
 fn apply_edit(p: &mut Planner, id: u64, occurrence: Option<NaiveDate>, edit: Edit) {
     let Some(task) = p.task_mut(id) else { return };
     task.title = edit.title;
+    task.description = edit.description;
     task.time = edit.time;
     task.color = edit.color;
     // Une série garde son point de départ ; une nouvelle série part de la semaine affichée.

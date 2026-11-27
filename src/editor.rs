@@ -24,6 +24,9 @@ pub struct Editor {
     pub occurrence: Option<NaiveDate>,
     pub was_recurring: bool,
     title: String,
+    description: String,
+    /// La description avait le focus à l'image précédente : Entrée y fait un retour à la ligne.
+    description_focused: bool,
     time_text: String,
     color: TaskColor,
     kind: Kind,
@@ -48,6 +51,7 @@ pub enum Outcome {
 /// Les valeurs validées du formulaire.
 pub struct Edit {
     pub title: String,
+    pub description: String,
     pub time: Option<NaiveTime>,
     pub color: TaskColor,
     pub kind: Kind,
@@ -86,6 +90,8 @@ impl Editor {
             occurrence: if task.is_recurring() { key.date } else { None },
             was_recurring: task.is_recurring(),
             title: task.title.clone(),
+            description: task.description.clone(),
+            description_focused: false,
             time_text: task.time.map(dates::format_time).unwrap_or_default(),
             color: task.color,
             kind,
@@ -111,6 +117,7 @@ impl Editor {
         }
         Ok(Edit {
             title: title.to_owned(),
+            description: self.description.trim().to_owned(),
             time,
             color: self.color,
             kind: self.kind,
@@ -156,6 +163,18 @@ impl Editor {
             title.request_focus();
             self.first_frame = false;
         }
+        ui.add_space(6.0);
+
+        label(ui, "Description (facultative)");
+        let description = ui.add(
+            TextEdit::multiline(&mut self.description)
+                .hint_text("Notes, détails, liens…")
+                .desired_width(f32::INFINITY)
+                .desired_rows(3)
+                .margin(vec2(10.0, 8.0)),
+        );
+        let description_focused = self.description_focused || description.has_focus();
+        self.description_focused = description.has_focus();
         ui.add_space(6.0);
 
         ui.horizontal(|ui| {
@@ -323,7 +342,11 @@ impl Editor {
             });
         });
 
-        if ui.input(|i| i.key_pressed(Key::Enter)) && matches!(outcome, Outcome::Open) {
+        // Entrée enregistre, sauf dans la description où elle passe à la ligne.
+        if ui.input(|i| i.key_pressed(Key::Enter))
+            && !description_focused
+            && matches!(outcome, Outcome::Open)
+        {
             outcome = Outcome::Save(Edit::placeholder());
         }
         if matches!(outcome, Outcome::Save(_)) {
@@ -381,6 +404,7 @@ impl Edit {
     fn placeholder() -> Self {
         Self {
             title: String::new(),
+            description: String::new(),
             time: None,
             color: TaskColor::Violet,
             kind: Kind::Someday,
